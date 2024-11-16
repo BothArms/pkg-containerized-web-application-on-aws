@@ -9,6 +9,7 @@ import * as elasticache from "aws-cdk-lib/aws-elasticache";
 import * as rds from "aws-cdk-lib/aws-rds";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 
@@ -27,6 +28,8 @@ export class Stack extends cdk.Stack {
 
     const wafWebAcl = this.createWafWebAcl();
 
+    const bucket = this.createBucket();
+
     const { rdsSecurityGroup, rdsCluster } = this.createRdsCluster(vpc);
 
     const { cacheSecurityGroup, cacheCluster } = this.createCacheCluster(vpc);
@@ -41,7 +44,8 @@ export class Stack extends cdk.Stack {
       cacheCluster,
       rdsSecurityGroup,
       cacheSecurityGroup,
-      certificate
+      certificate,
+      bucket
     );
 
     const cloudfrontDistribution = this.createCloudfrontDistribution(
@@ -88,6 +92,10 @@ export class Stack extends cdk.Stack {
     });
   }
 
+  createBucket() {
+    return new s3.Bucket(this, "Bucket", {});
+  }
+
   createEcsCluster(vpc: ec2.Vpc) {
     return new ecs.Cluster(this, "Cluster", {
       vpc,
@@ -100,7 +108,8 @@ export class Stack extends cdk.Stack {
     cacheCluster: elasticache.CfnCacheCluster,
     rdsSecurityGroup: ec2.SecurityGroup,
     cacheSecurityGroup: ec2.SecurityGroup,
-    certificate: acm.Certificate
+    certificate: acm.Certificate,
+    bucket: s3.Bucket
   ) {
     const service = new ecsPatterns.ApplicationLoadBalancedFargateService(
       this,
@@ -155,6 +164,8 @@ export class Stack extends cdk.Stack {
       requestsPerTarget: 10000,
       targetGroup: service.targetGroup,
     });
+
+    bucket.grantReadWrite(service.taskDefinition.taskRole);
 
     return service;
   }
